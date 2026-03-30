@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Settings</h2>
+
+<div id="alert" class="alert d-none" role="alert"></div>
+
+<form id="settings-form">
+  <div class="card mb-4">
+    <div class="card-header"><strong>File Generation</strong></div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label">Font path</label>
+        <input type="text" name="font_path" class="form-control font-monospace"
+               value="{{ settings.get('font_path', '') }}"
+               placeholder="fonts/YourFont.ttf">
+        <div class="form-text">
+          Absolute or relative path to your .ttf or .otf file.
+          The font must include all characters used in customer names.
+        </div>
+      </div>
+      <div class="mb-0">
+        <label class="form-label">Output directory</label>
+        <input type="text" name="output_dir" class="form-control font-monospace"
+               value="{{ settings.get('output_dir', 'output') }}"
+               placeholder="output">
+        <div class="form-text">Where PDFs and ZIPs are written. Relative to the app root.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><strong>Shopify API</strong></div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label">API version</label>
+        <input type="text" name="shopify_api_version" class="form-control font-monospace"
+               value="{{ settings.get('shopify_api_version', '') }}"
+               placeholder="2024-04">
+        <div class="form-text">
+          Check <a href="https://shopify.dev/changelog" target="_blank" rel="noopener">shopify.dev/changelog</a>
+          quarterly for deprecation notices and update this when prompted.
+        </div>
+      </div>
+      <div class="mb-0">
+        <label class="form-label">Access token</label>
+        <input type="text" class="form-control font-monospace"
+               value="{{ '••••••••' + settings.get('shopify_access_token', '')[-4:] if settings.get('shopify_access_token') else '' }}"
+               placeholder="Obtained automatically via OAuth"
+               disabled>
+        <div class="form-text">Set during app install via OAuth. Not editable here.</div>
+      </div>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary px-4">Save Settings</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('settings-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const alertEl = document.getElementById('alert');
+  alertEl.className = 'alert d-none';
+
+  const formData = new FormData(this);
+  const payload = {};
+  for (const [key, value] of formData.entries()) {
+    payload[key] = value;
+  }
+
+  try {
+    const resp = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      alertEl.className = 'alert alert-success';
+      alertEl.textContent = 'Settings saved.';
+    } else {
+      alertEl.className = 'alert alert-danger';
+      alertEl.textContent = 'Save failed: ' + (data.error || 'Unknown error');
+    }
+  } catch (err) {
+    alertEl.className = 'alert alert-danger';
+    alertEl.textContent = 'Save failed: ' + err.message;
+  }
+});
+</script>
+{% endblock %}

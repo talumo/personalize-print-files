@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}{% if template %}Edit Template{% else %}New Template{% endif %}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <a href="/templates?host={{ host }}" class="btn btn-outline-secondary btn-sm me-3">&larr; Back</a>
+  <h2 class="mb-0">{% if template %}Edit Template{% else %}New Template{% endif %}</h2>
+</div>
+
+<div id="alert" class="alert d-none" role="alert"></div>
+
+<form id="editor-form" enctype="multipart/form-data">
+  <div class="row g-4">
+
+    <!-- Left column: identity + image -->
+    <div class="col-md-5">
+      <div class="card">
+        <div class="card-header"><strong>Identity</strong></div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">Theme key <span class="text-danger">*</span></label>
+            <input type="text" name="theme_key" class="form-control font-monospace"
+                   value="{{ template.theme_key if template else '' }}"
+                   placeholder="e.g. bunny-love"
+                   {% if template %}readonly{% endif %}
+                   required>
+            <div class="form-text">Lowercase, hyphens only. Read-only after creation.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Product key <span class="text-danger">*</span></label>
+            <input type="text" name="product_key" class="form-control font-monospace"
+                   value="{{ template.product_key if template else '' }}"
+                   placeholder="e.g. plate"
+                   {% if template %}readonly{% endif %}
+                   required>
+            <div class="form-text">One of: plate, bowl, mug, placemat, spoon_fork</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header"><strong>Template Image</strong></div>
+        <div class="card-body">
+          {% if template and template.template_path %}
+          <div class="mb-2">
+            <div class="form-text mb-1">Current path:</div>
+            <code class="small">{{ template.template_path }}</code>
+          </div>
+          <input type="hidden" name="template_path_existing" value="{{ template.template_path }}">
+          <div class="mb-3">
+            <label class="form-label">Replace image (optional)</label>
+            <input type="file" name="template_image" class="form-control" accept=".png,.jpg,.jpeg">
+          </div>
+          {% else %}
+          <div class="mb-3">
+            <label class="form-label">PNG file <span class="text-danger">*</span></label>
+            <input type="file" name="template_image" class="form-control" accept=".png,.jpg,.jpeg" required>
+            <div class="form-text">Export full canvas at 300 DPI from Photoshop, no trimming.</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header"><strong>Keywords</strong></div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">Theme keywords</label>
+            <input type="text" name="theme_keywords" id="theme_keywords" class="form-control font-monospace"
+                   value="{{ (template.theme_keywords | from_json | join(', ')) if template else '' }}"
+                   placeholder="bunny, bunny love">
+            <div class="form-text">Comma-separated. Matched against Shopify product title to identify the design theme.</div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label">Product keywords</label>
+            <input type="text" name="product_keywords" id="product_keywords" class="form-control font-monospace"
+                   value="{{ (template.product_keywords | from_json | join(', ')) if template else '' }}"
+                   placeholder="plate, dinner plate">
+            <div class="form-text">Comma-separated. Matched against product title to identify product type.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: text box + typography -->
+    <div class="col-md-7">
+      <div class="card">
+        <div class="card-header"><strong>Text Box Position</strong></div>
+        <div class="card-body">
+          <p class="form-text mb-3">
+            Pixel coordinates on the exported template image (origin = top-left corner).
+            Measure from your Photoshop text layer bounds.
+          </p>
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">X (left edge)</label>
+              <input type="number" name="x" class="form-control"
+                     value="{{ (template.text_box_json | from_json).x if template else 0 }}" min="0" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Y (top edge)</label>
+              <input type="number" name="y" class="form-control"
+                     value="{{ (template.text_box_json | from_json).y if template else 0 }}" min="0" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Width</label>
+              <input type="number" name="width" class="form-control"
+                     value="{{ (template.text_box_json | from_json).width if template else 400 }}" min="1" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Height</label>
+              <input type="number" name="height" class="form-control"
+                     value="{{ (template.text_box_json | from_json).height if template else 100 }}" min="1" required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header"><strong>Typography</strong></div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">Max font size (px)</label>
+              <input type="number" name="max_font_size" class="form-control"
+                     value="{{ template.max_font_size if template else 72 }}" min="1" required>
+              <div class="form-text">Starting size; shrinks to fit.</div>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Min font size (px)</label>
+              <input type="number" name="min_font_size" class="form-control"
+                     value="{{ template.min_font_size if template else 18 }}" min="1" required>
+              <div class="form-text">Never renders smaller than this.</div>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Font color</label>
+              <div class="input-group">
+                <input type="color" name="font_color" class="form-control form-control-color"
+                       value="{{ template.font_color if template else '#5A3E2B' }}" required>
+                <input type="text" id="font_color_hex" class="form-control font-monospace"
+                       value="{{ template.font_color if template else '#5A3E2B' }}"
+                       pattern="^#[0-9A-Fa-f]{6}$" placeholder="#5A3E2B">
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Letter spacing (px)</label>
+              <input type="number" name="letter_spacing" class="form-control"
+                     value="{{ template.letter_spacing if template else 0 }}" min="0" required>
+              <div class="form-text">Extra pixels between characters.</div>
+            </div>
+            <div class="col-6">
+              <label class="form-label">DPI</label>
+              <input type="number" name="dpi" class="form-control"
+                     value="{{ template.dpi if template else 300 }}" min="72" required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary px-4">Save Template</button>
+        <a href="/templates?host={{ host }}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </div>
+
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Keep hex text input in sync with color picker
+const colorPicker = document.querySelector('[name="font_color"]');
+const colorHex    = document.getElementById('font_color_hex');
+
+colorPicker.addEventListener('input', () => { colorHex.value = colorPicker.value; });
+colorHex.addEventListener('input', () => {
+  if (/^#[0-9A-Fa-f]{6}$/.test(colorHex.value)) {
+    colorPicker.value = colorHex.value;
+  }
+});
+
+// Convert comma-separated keyword inputs to JSON arrays on submit
+document.getElementById('editor-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const alertEl = document.getElementById('alert');
+  alertEl.className = 'alert d-none';
+
+  // Sync color picker value into the hidden field
+  document.querySelector('[name="font_color"]').value = colorHex.value;
+
+  const formData = new FormData(this);
+
+  // Convert keyword fields from "a, b, c" → JSON array
+  for (const field of ['theme_keywords', 'product_keywords']) {
+    const raw = formData.get(field) || '';
+    const arr = raw.split(',').map(s => s.trim()).filter(Boolean);
+    formData.set(field, JSON.stringify(arr));
+  }
+
+  try {
+    const resp = await fetch('/api/templates', { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (data.ok) {
+      alertEl.className = 'alert alert-success';
+      alertEl.textContent = 'Template saved.';
+      const host = new URLSearchParams(window.location.search).get('host') || '';
+      setTimeout(() => { window.location.href = '/templates' + (host ? '?host=' + host : ''); }, 800);
+    } else {
+      alertEl.className = 'alert alert-danger';
+      alertEl.textContent = 'Save failed: ' + (data.error || 'Unknown error');
+    }
+  } catch (err) {
+    alertEl.className = 'alert alert-danger';
+    alertEl.textContent = 'Save failed: ' + err.message;
+  }
+});
+</script>
+{% endblock %}
