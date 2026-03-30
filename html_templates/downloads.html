@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Downloads{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Downloads</h2>
+
+{% if current_job %}
+  {% if current_job.status in ('pending', 'running') %}
+  <div class="alert alert-info d-flex align-items-center gap-3" role="alert">
+    <div class="spinner-border spinner-border-sm text-info" role="status" aria-hidden="true"></div>
+    <div>Generating your print files&hellip;</div>
+  </div>
+  {% elif current_job.status == 'complete' %}
+  <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
+    <span><strong>Files ready!</strong> Your print files have been generated.</span>
+    <a href="/api/jobs/{{ job_id }}/download" class="btn btn-success btn-sm">
+      Download ZIP
+    </a>
+  </div>
+  {% elif current_job.status == 'failed' %}
+  <div class="alert alert-danger" role="alert">
+    <strong>Generation failed.</strong>
+    {% set result = current_job.result_json | default('{}') %}
+    Job <code>{{ job_id }}</code> encountered an error.
+  </div>
+  {% endif %}
+{% endif %}
+
+<h5 class="mt-4 mb-3">Recent Jobs</h5>
+
+{% if jobs %}
+<table class="table table-bordered table-hover align-middle">
+  <thead class="table-dark">
+    <tr>
+      <th>Date</th>
+      <th>Orders</th>
+      <th>Files Generated</th>
+      <th>Status</th>
+      <th>Download</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for job in jobs %}
+    {% set order_ids = job.order_ids | default('[]') %}
+    {% set result = job.result_json | default('{}') %}
+    <tr>
+      <td>{{ job.created_at[:19] | replace('T', ' ') }}</td>
+      <td>
+        {% if job.order_ids %}
+          {{ (job.order_ids | from_json | list | length) }}
+        {% else %}
+          &mdash;
+        {% endif %}
+      </td>
+      <td>
+        {% if job.result_json %}
+          {% set res = job.result_json | from_json %}
+          {% if res.zip_paths is defined %}
+            {{ res.zip_paths | length }}
+          {% else %}
+            &mdash;
+          {% endif %}
+        {% else %}
+          &mdash;
+        {% endif %}
+      </td>
+      <td>
+        {% if job.status == 'complete' %}
+          <span class="badge bg-success">complete</span>
+        {% elif job.status == 'running' %}
+          <span class="badge bg-warning text-dark">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            running
+          </span>
+        {% elif job.status == 'failed' %}
+          <span class="badge bg-danger">failed</span>
+        {% else %}
+          <span class="badge bg-secondary">{{ job.status }}</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if job.status == 'complete' %}
+          <a href="/api/jobs/{{ job.job_id }}/download" class="btn btn-sm btn-outline-primary">
+            Download
+          </a>
+        {% else %}
+          &mdash;
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="alert alert-info" role="alert">No jobs yet.</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if job_id and current_job and current_job.status in ('pending', 'running') %}
+<script>
+const pollInterval = setInterval(async function() {
+  const resp = await fetch('/api/jobs/{{ job_id }}');
+  const job = await resp.json();
+  if (job.status === 'complete' || job.status === 'failed') {
+    clearInterval(pollInterval);
+    window.location.reload();
+  }
+}, 2000);
+</script>
+{% endif %}
+{% endblock %}

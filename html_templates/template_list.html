@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Print Templates{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h2 class="mb-0">Print Templates</h2>
+  <div class="d-flex gap-2">
+    <a href="/templates/new?host={{ host }}" class="btn btn-primary">Add Template</a>
+    <button id="import-btn" class="btn btn-outline-secondary">Import from template_config.json</button>
+  </div>
+</div>
+
+<div id="import-alert" class="alert d-none" role="alert"></div>
+
+{% if themes %}
+  {% for theme_key, products in themes.items() %}
+  <div class="card mb-4">
+    <div class="card-header">
+      <strong>{{ theme_key }}</strong>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-bordered table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Product Key</th>
+            <th>Text Box (x, y, w, h)</th>
+            <th>Font Size Range</th>
+            <th>Letter Spacing</th>
+            <th>DPI</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in products %}
+          {% set tb = product.text_box_json | from_json %}
+          <tr id="row-{{ theme_key }}-{{ product.product_key }}">
+            <td><code>{{ product.product_key }}</code></td>
+            <td>{{ tb.x }}, {{ tb.y }}, {{ tb.width }}, {{ tb.height }}</td>
+            <td>{{ product.min_font_size }}&ndash;{{ product.max_font_size }}</td>
+            <td>{{ product.letter_spacing }}</td>
+            <td>{{ product.dpi }}</td>
+            <td>
+              <a href="/templates/{{ theme_key }}/{{ product.product_key }}/edit?host={{ host }}"
+                 class="btn btn-sm btn-outline-primary me-1">Edit</a>
+              <button class="btn btn-sm btn-outline-danger delete-btn"
+                      data-theme="{{ theme_key }}"
+                      data-product="{{ product.product_key }}">Delete</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+<div class="alert alert-info" role="alert">No templates configured yet.</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('import-btn').addEventListener('click', async function() {
+  const alertEl = document.getElementById('import-alert');
+  alertEl.className = 'alert d-none';
+  alertEl.textContent = '';
+  try {
+    const formData = new FormData();
+    formData.append('json_path', 'template_config.json');
+    const resp = await fetch('/api/templates/import-json', { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (data.ok) {
+      alertEl.className = 'alert alert-success';
+      alertEl.textContent = `Imported ${data.imported} template(s) successfully.`;
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      alertEl.className = 'alert alert-danger';
+      alertEl.textContent = 'Import failed: ' + (data.error || 'Unknown error');
+    }
+  } catch (e) {
+    alertEl.className = 'alert alert-danger';
+    alertEl.textContent = 'Import failed: ' + e.message;
+  }
+});
+
+document.querySelectorAll('.delete-btn').forEach(function(btn) {
+  btn.addEventListener('click', async function() {
+    const theme = btn.dataset.theme;
+    const product = btn.dataset.product;
+    if (!confirm(`Delete template ${theme}/${product}?`)) return;
+    try {
+      const resp = await fetch(`/api/templates/${theme}/${product}`, { method: 'DELETE' });
+      const data = await resp.json();
+      if (data.ok) {
+        const row = document.getElementById(`row-${theme}-${product}`);
+        if (row) row.remove();
+      } else {
+        alert('Delete failed: ' + (data.error || 'Unknown error'));
+      }
+    } catch (e) {
+      alert('Delete failed: ' + e.message);
+    }
+  });
+});
+</script>
+{% endblock %}
