@@ -1,0 +1,44 @@
+{
+  "defaults": {
+    "max_font_size": 72,
+    "min_font_size": 18,
+    "font_color": "#5A3E2B",
+    "letter_spacing": 0,
+    "dpi": 300
+  },
+  "theme_mapping": {
+    "bunny-love": ["bunny", "bunny love"]
+  },
+  "themes": {
+    "bunny-love": {
+      "plate": {
+        "template": "templates/bunny-love/plate.png",
+        "text_box": { "x": 210, "y": 380, "width": 480, "height": 80 },
+        "letter_spacing": 4
+      },
+      "bowl": {
+        "template": "templates/bunny-love/bowl.png",
+        "text_box": { "x": 180, "y": 310, "width": 420, "height": 70 }
+      },
+      "mug": {
+        "template": "templates/bunny-love/mug.png",
+        "text_box": { "x": 150, "y": 260, "width": 380, "height": 65 }
+      },
+      "placemat": {
+        "template": "templates/bunny-love/placemat.png",
+        "text_box": { "x": 300, "y": 520, "width": 600, "height": 90 }
+      },
+      "spoon_fork": {
+        "template": "templates/bunny-love/spoon_fork.png",
+        "text_box": { "x": 80, "y": 200, "width": 200, "height": 50 }
+      }
+    }
+  },
+  "product_mapping": {
+    "plate": ["plate"],
+    "bowl": ["bowl"],
+    "mug": ["mug"],
+    "placemat": ["placemat", "place mat"],
+    "spoon_fork": ["spoon", "fork", "cutlery", "utensil"]
+  }
+}
