@@ -65,6 +65,7 @@
       <th>Files Generated</th>
       <th>Status</th>
       <th>Download</th>
+      <th>Re-test</th>
     </tr>
   </thead>
   <tbody>
@@ -115,6 +116,13 @@
           &mdash;
         {% endif %}
       </td>
+      <td>
+        <button class="btn btn-sm btn-outline-secondary reset-btn"
+                data-job-id="{{ job.job_id }}"
+                title="Remove from processed so orders reappear as pending">
+          Reset to Pending
+        </button>
+      </td>
     </tr>
     {% endfor %}
   </tbody>
@@ -138,4 +146,28 @@ const pollInterval = setInterval(async function() {
 }, 2000);
 </script>
 {% endif %}
+<script>
+document.querySelectorAll('.reset-btn').forEach(function(btn) {
+  btn.addEventListener('click', async function() {
+    const jobId = btn.dataset.jobId;
+    if (!confirm('Reset these orders to pending? They will reappear on the Orders page.')) return;
+    btn.disabled = true;
+    btn.textContent = 'Resetting…';
+    try {
+      const resp = await fetch(`/api/jobs/${jobId}/reset`, { method: 'POST' });
+      const data = await resp.json();
+      if (data.ok) {
+        btn.textContent = 'Done — go to Orders';
+        btn.classList.replace('btn-outline-secondary', 'btn-outline-success');
+        btn.onclick = () => { window.location.href = '/orders'; };
+        btn.disabled = false;
+      } else {
+        btn.textContent = 'Error';
+      }
+    } catch (e) {
+      btn.textContent = 'Error';
+    }
+  });
+});
+</script>
 {% endblock %}

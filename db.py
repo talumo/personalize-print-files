@@ -317,6 +317,16 @@ def mark_processed(order_id: str, job_id: str = None):
         conn.close()
 
 
+def unmark_processed(order_id: str):
+    """Remove an order from processed_orders so it reappears on the Orders page."""
+    conn = get_conn()
+    try:
+        conn.execute('DELETE FROM processed_orders WHERE order_id = ?', (order_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def get_processed_order_ids() -> set:
     conn = get_conn()
     try:

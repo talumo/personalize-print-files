@@ -57,3 +57,16 @@ def download_zip(job_id):
     return send_file(combined, as_attachment=True,
                      download_name=f'orders-{job_id[:8]}.zip',
                      mimetype='application/zip')
+
+
+@downloads_bp.route('/api/jobs/<job_id>/reset', methods=['POST'])
+def reset_job_orders(job_id):
+    """Remove all orders in a job from processed_orders so they reappear as pending."""
+    job = db.get_job(job_id)
+    if not job:
+        return jsonify({'error': 'Job not found'}), 404
+    import json as _json
+    order_ids = _json.loads(job['order_ids'] or '[]')
+    for order_id in order_ids:
+        db.unmark_processed(order_id)
+    return jsonify({'ok': True, 'reset': order_ids})
