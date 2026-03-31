@@ -345,7 +345,7 @@ class WebConfig:
 
 
 def get_web_config() -> WebConfig:
-    return WebConfig(
-        font_path=get_setting('font_path', ''),
-        output_dir=get_setting('output_dir', 'output'),
-    )
+    # Fall back to FONT_PATH env var if not set in DB (e.g. on first deploy)
+    font_path = get_setting('font_path') or os.environ.get('FONT_PATH', '')
+    output_dir = get_setting('output_dir') or os.environ.get('OUTPUT_DIR', 'output')
+    return WebConfig(font_path=font_path, output_dir=output_dir)
