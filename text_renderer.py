@@ -22,17 +22,22 @@ def render(base_image_path: str, name: str, config: TemplateConfig,
 
     img = Image.open(base_image_path).convert("RGBA")
     draw = ImageDraw.Draw(img)
+    img_w, img_h = img.size
+    logger.info("Rendering %r onto image %dx%d, font=%r", name, img_w, img_h, font_path)
 
     box = config.text_box
     font_size = config.max_font_size
     font = None
     total_width = None
+    font_loaded_ok = False
 
     # Auto-size: reduce until text fits box width
     while font_size >= config.min_font_size:
         try:
             font = ImageFont.truetype(font_path, font_size)
-        except (AttributeError, OSError):
+            font_loaded_ok = True
+        except (AttributeError, OSError) as e:
+            logger.warning("Font load failed (%s), using default", e)
             font = ImageFont.load_default()
         total_width = measure_text_width(name, font, config.letter_spacing)
         if total_width <= box["width"]:
@@ -54,6 +59,19 @@ def render(base_image_path: str, name: str, config: TemplateConfig,
     font_height = font.getbbox("A")[3]  # approximate cap height
     x = box["x"] + (box["width"] - total_width) // 2
     y = box["y"] + (box["height"] - font_height) // 2
+
+    logger.info(
+        "Text box: x=%d y=%d w=%d h=%d | font_size=%d font_ok=%s | "
+        "text_w=%d text_h=%d | draw_at=(%d,%d) | color=%s | image=%dx%d",
+        box["x"], box["y"], box["width"], box["height"],
+        font_size, font_loaded_ok,
+        total_width, font_height,
+        x, y, config.font_color,
+        img_w, img_h,
+    )
+
+    if x < 0 or y < 0 or x >= img_w or y >= img_h:
+        logger.warning("draw_at (%d,%d) is outside image bounds %dx%d — text will not be visible", x, y, img_w, img_h)
 
     # Draw character by character with letter spacing
     cursor_x = x
