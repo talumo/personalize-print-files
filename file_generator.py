@@ -44,7 +44,8 @@ def generate_order(order: Order, template_manager, config) -> GenerationResult:
         try:
             composited = render(tmpl.template_path, item.name, tmpl, config.font_path)
             rgb = _flatten_to_rgb(composited)
-            pdf_path = order_dir / f"{tmpl.product_key}.pdf"
+            safe_item_name = sanitize_name(item.name)
+            pdf_path = order_dir / f"{tmpl.product_key}_{safe_item_name}.pdf"
             _save_as_pdf(rgb, pdf_path, tmpl.dpi)
             generated += 1
         except Exception as e:

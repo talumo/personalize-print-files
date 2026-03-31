@@ -68,13 +68,50 @@ def test_generate_order_creates_pdf_and_zip(tmp_path):
     output_root = Path(cfg_mock.output_dir)
     pdfs = list(output_root.rglob("*.pdf"))
     assert len(pdfs) == 1
-    assert pdfs[0].name == "plate.pdf"
+    assert pdfs[0].name == "plate_Emma.pdf"
 
     # Check zip exists
     zips = list(output_root.rglob("*.zip"))
     assert len(zips) == 1
     with zipfile.ZipFile(zips[0]) as z:
-        assert any(n.endswith("plate.pdf") for n in z.namelist())
+        assert any(n.endswith("plate_Emma.pdf") for n in z.namelist())
+
+def test_same_product_different_names_generates_both(tmp_path):
+    """Two bowls in one order (Liam + William) must produce two separate PDFs."""
+    cfg_mock = MagicMock()
+    cfg_mock.font_path = ""
+    cfg_mock.output_dir = str(tmp_path / "output")
+
+    tmpl_cfg = _make_template_config(tmp_path)
+    tmpl_cfg = TemplateConfig(
+        template_path=tmpl_cfg.template_path,
+        product_key="bowl",
+        text_box=tmpl_cfg.text_box,
+        max_font_size=tmpl_cfg.max_font_size,
+        min_font_size=tmpl_cfg.min_font_size,
+        font_color=tmpl_cfg.font_color,
+        letter_spacing=tmpl_cfg.letter_spacing,
+        dpi=tmpl_cfg.dpi,
+    )
+    tm = MagicMock()
+    tm.resolve.return_value = tmpl_cfg
+
+    order = Order(
+        order_id="3001", order_number="#3001",
+        created_at="2026-03-31T10:00:00Z",
+        line_items=[
+            LineItem(title="Airplane Kids Dinnerware Bowl", name="Liam"),
+            LineItem(title="Airplane Kids Dinnerware Bowl", name="William"),
+        ]
+    )
+    result = generate_order(order, tm, cfg_mock)
+
+    assert result.files_generated == 2
+    output_root = Path(cfg_mock.output_dir)
+    pdfs = {p.name for p in output_root.rglob("*.pdf")}
+    assert "bowl_Liam.pdf" in pdfs
+    assert "bowl_William.pdf" in pdfs
+
 
 def test_unresolved_product_counted_as_skipped(tmp_path):
     cfg_mock = MagicMock()
