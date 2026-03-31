@@ -11,7 +11,9 @@ import db
 templates_bp = Blueprint('templates', __name__)
 
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-UPLOAD_FOLDER = 'uploads'
+# Default to a subfolder of the data volume so uploads survive redeploys.
+# Set UPLOAD_FOLDER env var to override (e.g. /app/data/uploads on Railway).
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'uploads')
 
 
 def _allowed_image(filename: str) -> bool:
