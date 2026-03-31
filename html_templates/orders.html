@@ -41,14 +41,16 @@
       <td>{{ order.created_at[:10] }}</td>
       <td>
         {% if order.line_items %}
-          {{ order.line_items[0].name }}
+          {% set names = order.line_items | map(attribute='name') | list | unique | list %}
+          {{ names | join(', ') }}
         {% else %}
           &mdash;
         {% endif %}
       </td>
       <td>
         {% if order.line_items %}
-          {{ order.line_items | map(attribute='title') | join(', ') }}
+          {% set titles = order.line_items | map(attribute='title') | list | unique | list %}
+          {{ titles | join(', ') }}
         {% else %}
           &mdash;
         {% endif %}

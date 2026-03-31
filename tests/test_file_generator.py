@@ -70,9 +70,11 @@ def test_generate_order_creates_pdf_and_zip(tmp_path):
     assert len(pdfs) == 1
     assert pdfs[0].name == "plate_Emma.pdf"
 
-    # Check zip exists
+    # Check zip exists and result carries the path
+    assert result.zip_path
     zips = list(output_root.rglob("*.zip"))
     assert len(zips) == 1
+    assert str(zips[0]) == result.zip_path
     with zipfile.ZipFile(zips[0]) as z:
         assert any(n.endswith("plate_Emma.pdf") for n in z.namelist())
 

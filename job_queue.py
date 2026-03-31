@@ -1,6 +1,5 @@
 import json
 import logging
-import pathlib
 import queue
 import threading
 import uuid
@@ -57,11 +56,12 @@ def _process_job(job_id: str):
                 total_skip += result.files_skipped
                 total_fail += result.files_failed
                 db.mark_processed(order_id, job_id)
-                # Collect zip path from output dir
-                output_root = pathlib.Path(config.output_dir)
-                zips = list(output_root.rglob(f'ORDER-{order_id}_*.zip'))
-                if zips:
-                    zip_paths.append(str(zips[0]))
+                if result.zip_path:
+                    zip_paths.append(result.zip_path)
+                    logger.info("Order %s zip: %s", order_id, result.zip_path)
+                else:
+                    logger.warning("Order %s: no zip path returned — %d generated, %d failed",
+                                   order_id, result.files_generated, result.files_failed)
         except ShopifyAuthError as e:
             logger.error("Auth error processing order %s: %s", order_id, e)
             db.update_job_status(job_id, 'failed', error='Shopify authentication failed. Check API credentials in Settings.')

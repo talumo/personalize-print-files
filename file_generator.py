@@ -64,6 +64,7 @@ def generate_order(order: Order, template_manager, config) -> GenerationResult:
         files_generated=generated,
         files_skipped=skipped,
         files_failed=failed,
+        zip_path=str(zip_path),
     )
 
 def _flatten_to_rgb(img: Image.Image) -> Image.Image:

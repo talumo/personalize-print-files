@@ -48,6 +48,37 @@ def test_web_template_manager_resolve_no_match(isolated_db):
     assert result is None
 
 
+def test_zip_path_stored_in_result_json(isolated_db):
+    """zip_paths in result_json comes from GenerationResult.zip_path, not filesystem glob."""
+    import job_queue
+    from models import Order, LineItem, GenerationResult
+
+    mock_order = Order(
+        order_id='5001', order_number='#5001',
+        created_at='2026-03-31T10:00:00Z',
+        line_items=[LineItem(title='Airplane Kids Dinnerware Bowl', name='William')],
+    )
+    fake_result = GenerationResult('5001', files_generated=1, files_skipped=0,
+                                   files_failed=0, zip_path='/app/data/output/ORDER-5001_William.zip')
+
+    with patch('job_queue.ShopifyClient') as mock_client_cls, \
+         patch('job_queue.WebTemplateManager'), \
+         patch('job_queue.generate_order', return_value=fake_result), \
+         patch('job_queue.db.get_setting', return_value='token'), \
+         patch('job_queue.db.mark_processed'):
+        mock_client = MagicMock()
+        mock_client.fetch_order_by_id.return_value = [mock_order]
+        mock_client_cls.return_value = mock_client
+
+        db_module.create_job('job-zip-test', ['5001'], 'pending')
+        job_queue._process_job('job-zip-test')
+
+    job = db_module.get_job('job-zip-test')
+    result = json.loads(job['result_json'])
+    assert result['zip_paths'] == ['/app/data/output/ORDER-5001_William.zip']
+    assert result['generated'] == 1
+
+
 def test_job_status_api(isolated_db, monkeypatch):
     monkeypatch.setenv('SECRET_KEY', 'test')
     monkeypatch.setenv('SHOPIFY_API_KEY', 'k')

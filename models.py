@@ -29,4 +29,5 @@ class GenerationResult:
     files_generated: int
     files_skipped: int
     files_failed: int
+    zip_path: str = ""   # absolute path to the zip file written by file_generator
     # orders_processed is NOT here — aggregated by run_batch.py across all results
