@@ -87,6 +87,20 @@ def test_personalization_key_case_insensitive():
         orders = client.fetch_pending_orders()
     assert orders[0].line_items[0].name == "Sofía"
 
+def test_personalization_key_with_double_colon():
+    order_data = {
+        **MOCK_ORDER,
+        "line_items": [{
+            "title": "Bunny Love Plate Set",
+            "properties": [{"name": "Personalization::", "value": "Lily"}]
+        }]
+    }
+    client = make_client()
+    with patch("shopify_client.requests.get",
+               return_value=mock_response({"orders": [order_data]})):
+        orders = client.fetch_pending_orders()
+    assert orders[0].line_items[0].name == "Lily"
+
 def test_rate_limit_retries(monkeypatch):
     client = make_client()
     responses = [

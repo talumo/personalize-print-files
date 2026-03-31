@@ -5,7 +5,7 @@ from models import Order, LineItem
 
 logger = logging.getLogger(__name__)
 
-PERSONALIZATION_KEYS = {"personalization", "personalisation", "name"}
+PERSONALIZATION_KEYS = {"personalization", "personalization::", "personalisation", "name"}
 
 class ShopifyAuthError(Exception):
     pass
