@@ -115,6 +115,111 @@ def test_personalization_key_with_double_colon():
         orders = client.fetch_pending_orders()
     assert orders[0].line_items[0].name == "Lily"
 
+def _bundle_order(variant_title, props_extra=None):
+    """Helper: one line item bundle order with given variant_title."""
+    props = [{"name": "Personalization:", "value": "Tristan"}]
+    if props_extra:
+        props.extend(props_extra)
+    return {
+        "id": 2001,
+        "order_number": "#2001",
+        "created_at": "2026-03-31T10:00:00Z",
+        "line_items": [{
+            "title": "Airplane Kids Dinnerware",
+            "variant_title": variant_title,
+            "properties": props,
+        }]
+    }
+
+
+def test_bundle_variant_expands_to_one_item_per_piece():
+    client = make_client()
+    order_data = _bundle_order("Placemat + Plate + Bowl + Mug")
+    with patch("shopify_client.requests.get",
+               return_value=mock_response({"orders": [order_data]})):
+        orders = client.fetch_pending_orders()
+    titles = [li.title for li in orders[0].line_items]
+    assert len(titles) == 4
+    assert "Airplane Kids Dinnerware Placemat" in titles
+    assert "Airplane Kids Dinnerware Plate" in titles
+    assert "Airplane Kids Dinnerware Bowl" in titles
+    assert "Airplane Kids Dinnerware Mug" in titles
+    assert all(li.name == "Tristan" for li in orders[0].line_items)
+
+
+def test_bundle_partial_set():
+    client = make_client()
+    order_data = _bundle_order("Placemat + Plate")
+    with patch("shopify_client.requests.get",
+               return_value=mock_response({"orders": [order_data]})):
+        orders = client.fetch_pending_orders()
+    titles = [li.title for li in orders[0].line_items]
+    assert len(titles) == 2
+    assert "Airplane Kids Dinnerware Placemat" in titles
+    assert "Airplane Kids Dinnerware Plate" in titles
+
+
+def test_fork_spoon_addon_yes_appends_spoon_fork():
+    client = make_client()
+    order_data = _bundle_order(
+        "Placemat + Plate + Bowl + Mug",
+        props_extra=[{"name": "Matching fork & spoon:", "value": "Yes"}],
+    )
+    with patch("shopify_client.requests.get",
+               return_value=mock_response({"orders": [order_data]})):
+        orders = client.fetch_pending_orders()
+    titles = [li.title for li in orders[0].line_items]
+    assert len(titles) == 5
+    assert "Airplane Kids Dinnerware Spoon Fork" in titles
+
+
+def test_fork_spoon_addon_no_does_not_append():
+    client = make_client()
+    order_data = _bundle_order(
+        "Placemat + Plate",
+        props_extra=[{"name": "Matching fork & spoon:", "value": "No"}],
+    )
+    with patch("shopify_client.requests.get",
+               return_value=mock_response({"orders": [order_data]})):
+        orders = client.fetch_pending_orders()
+    titles = [li.title for li in orders[0].line_items]
+    assert len(titles) == 2
+    assert not any("Spoon Fork" in t for t in titles)
+
+
+def test_fork_spoon_standalone_variant():
+    client = make_client()
+    order_data = _bundle_order("Fork & Spoon")
+    with patch("shopify_client.requests.get",
+               return_value=mock_response({"orders": [order_data]})):
+        orders = client.fetch_pending_orders()
+    titles = [li.title for li in orders[0].line_items]
+    assert len(titles) == 1
+    assert titles[0] == "Airplane Kids Dinnerware Spoon Fork"
+
+
+def test_single_piece_variant():
+    client = make_client()
+    order_data = _bundle_order("Placemat")
+    with patch("shopify_client.requests.get",
+               return_value=mock_response({"orders": [order_data]})):
+        orders = client.fetch_pending_orders()
+    titles = [li.title for li in orders[0].line_items]
+    assert len(titles) == 1
+    assert titles[0] == "Airplane Kids Dinnerware Placemat"
+
+
+def test_default_title_variant_uses_product_title():
+    """Products with no variant selection (Default Title) are not expanded."""
+    client = make_client()
+    order_data = _bundle_order("Default Title")
+    with patch("shopify_client.requests.get",
+               return_value=mock_response({"orders": [order_data]})):
+        orders = client.fetch_pending_orders()
+    assert len(orders[0].line_items) == 1
+    assert orders[0].line_items[0].title == "Airplane Kids Dinnerware"
+
+
 def test_rate_limit_retries(monkeypatch):
     client = make_client()
     responses = [

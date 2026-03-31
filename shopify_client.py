@@ -1,14 +1,58 @@
 import logging, time
 import requests
-from urllib.parse import urlencode, quote
+from urllib.parse import urlencode
 from models import Order, LineItem
 
 logger = logging.getLogger(__name__)
 
 PERSONALIZATION_KEYS = {"personalization", "personalization:", "personalization::", "personalisation", "name"}
 
+# Maps lowercase piece keywords → canonical suffix appended to the product title
+# so template keyword matching can identify the product type.
+PIECE_MAP = {
+    "placemat":        "Placemat",
+    "plate":           "Plate",
+    "bowl":            "Bowl",
+    "mug":             "Mug",
+    "fork & spoon":    "Spoon Fork",
+    "fork and spoon":  "Spoon Fork",
+    "spoon & fork":    "Spoon Fork",
+    "spoon and fork":  "Spoon Fork",
+    "fork spoon":      "Spoon Fork",
+    "spoon fork":      "Spoon Fork",
+}
+
+# Property names that indicate an add-on fork & spoon (with/without trailing colon)
+FORK_SPOON_PROP_KEYS = {
+    "matching fork & spoon",
+    "matching fork & spoon:",
+    "matching fork and spoon",
+    "matching fork and spoon:",
+    "add matching fork & spoon",
+    "add fork & spoon",
+}
+
+
+def _parse_pieces(combo_str: str) -> list:
+    """Split 'Placemat + Plate + Bowl' into canonical piece names.
+
+    Unknown tokens are kept as-is so template matching can still attempt them.
+    """
+    pieces = []
+    for part in combo_str.split("+"):
+        part = part.strip()
+        lower = part.lower()
+        matched = next((canonical for key, canonical in PIECE_MAP.items() if key in lower), None)
+        if matched:
+            pieces.append(matched)
+        elif part:
+            pieces.append(part)
+    return pieces
+
+
 class ShopifyAuthError(Exception):
     pass
+
 
 class ShopifyClient:
     def __init__(self, access_token: str, store: str, api_version: str):
@@ -40,7 +84,7 @@ class ShopifyClient:
                 delay *= 2
                 continue
             resp.raise_for_status()
-        resp.raise_for_status()  # final attempt failed
+        resp.raise_for_status()
 
     def fetch_pending_orders(self, since_date=None) -> list:
         params = {
@@ -61,7 +105,6 @@ class ShopifyClient:
                 order = self._parse_order(raw)
                 if order.line_items:
                     all_orders.append(order)
-            # Pagination
             link = resp.headers.get("Link", "")
             url = self._next_url(link)
 
@@ -77,20 +120,63 @@ class ShopifyClient:
     def _parse_order(self, raw: dict) -> Order:
         items = []
         for item in raw.get("line_items", []):
-            name = self._extract_personalization(item.get("properties", []))
-            if name:
-                items.append(LineItem(title=item["title"], name=name))
-            else:
+            props = item.get("properties", [])
+            name = self._extract_personalization(props)
+            if not name:
                 logger.warning(
                     "Order %s: line item %r has no personalization property",
-                    raw.get("id"), item.get("title")
+                    raw.get("id"), item.get("title"),
                 )
+                continue
+
+            pieces = self._extract_pieces(item, props)
+            base_title = item["title"]
+
+            if pieces:
+                for piece in pieces:
+                    items.append(LineItem(title=f"{base_title} {piece}", name=name))
+            else:
+                items.append(LineItem(title=base_title, name=name))
+
         return Order(
             order_id=str(raw["id"]),
             order_number=str(raw.get("order_number", "")),
             created_at=raw.get("created_at", ""),
             line_items=items,
         )
+
+    def _extract_pieces(self, item: dict, props: list) -> list:
+        """Return ordered list of piece names to generate, or [] for single items."""
+        # variant_title holds the dropdown selection, e.g. "Placemat + Plate + Bowl + Mug"
+        variant_title = (item.get("variant_title") or "").strip()
+        skip_variants = {"default title", ""}
+
+        if variant_title.lower() not in skip_variants:
+            pieces = _parse_pieces(variant_title)
+        else:
+            # Fall back to checking if any property name looks like a combo
+            pieces = []
+            for prop in props:
+                prop_name = prop.get("name", "")
+                if "+" in prop_name:
+                    pieces = _parse_pieces(prop_name)
+                    break
+
+        if not pieces:
+            return []
+
+        # Add fork & spoon if the add-on property is "Yes"
+        if self._wants_fork_spoon(props) and "Spoon Fork" not in pieces:
+            pieces.append("Spoon Fork")
+
+        return pieces
+
+    def _wants_fork_spoon(self, props: list) -> bool:
+        for prop in props:
+            key = prop.get("name", "").lower().strip()
+            if key in FORK_SPOON_PROP_KEYS:
+                return prop.get("value", "").lower().strip() in ("yes", "y", "true", "1")
+        return False
 
     def _extract_personalization(self, properties: list):
         for prop in properties:
