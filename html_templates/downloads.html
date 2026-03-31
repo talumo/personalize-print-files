@@ -12,18 +12,45 @@
     <div>Generating your print files&hellip;</div>
   </div>
   {% elif current_job.status == 'complete' %}
+  {% set res = current_job.result_json | from_json %}
+  {% if res.generated > 0 %}
   <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
-    <span><strong>Files ready!</strong> Your print files have been generated.</span>
-    <a href="/api/jobs/{{ job_id }}/download" class="btn btn-success btn-sm">
-      Download ZIP
-    </a>
+    <span><strong>Files ready!</strong> {{ res.generated }} file(s) generated.</span>
+    <a href="/api/jobs/{{ job_id }}/download" class="btn btn-success btn-sm">Download ZIP</a>
   </div>
+  {% else %}
+  <div class="alert alert-warning" role="alert">
+    <strong>Job complete but no files were generated.</strong>
+    {% if res.skipped > 0 %}<div>{{ res.skipped }} item(s) skipped — no matching template found.</div>{% endif %}
+    {% if res.failed > 0 %}<div>{{ res.failed }} item(s) failed to generate.</div>{% endif %}
+  </div>
+  {% endif %}
+  {% if res.errors %}
+  <div class="card mb-3 border-danger">
+    <div class="card-header text-danger"><strong>Errors</strong></div>
+    <ul class="list-group list-group-flush">
+      {% for err in res.errors %}
+      <li class="list-group-item font-monospace small">{{ err }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
   {% elif current_job.status == 'failed' %}
+  {% set res = current_job.result_json | from_json if current_job.result_json else {} %}
   <div class="alert alert-danger" role="alert">
     <strong>Generation failed.</strong>
-    {% set result = current_job.result_json | default('{}') %}
-    Job <code>{{ job_id }}</code> encountered an error.
+    {% if res.error %}<div>{{ res.error }}</div>{% endif %}
   </div>
+  {% if res.errors %}
+  <div class="card mb-3 border-danger">
+    <div class="card-header text-danger"><strong>Errors</strong></div>
+    <ul class="list-group list-group-flush">
+      {% for err in res.errors %}
+      <li class="list-group-item font-monospace small">{{ err }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
   {% endif %}
 {% endif %}
 

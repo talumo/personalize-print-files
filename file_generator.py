@@ -33,12 +33,14 @@ def generate_order(order: Order, template_manager, config) -> GenerationResult:
     order_dir.mkdir(parents=True, exist_ok=True)
 
     generated = skipped = failed = 0
+    errors = []
 
     for item in order.line_items:
         tmpl = template_manager.resolve(item.title)
         if tmpl is None:
-            logger.warning("Order %s: no template for %r — skipping",
-                           order.order_id, item.title)
+            msg = f"No template matched for '{item.title}' (name: {item.name})"
+            logger.warning("Order %s: %s", order.order_id, msg)
+            errors.append(msg)
             skipped += 1
             continue
         try:
@@ -49,8 +51,9 @@ def generate_order(order: Order, template_manager, config) -> GenerationResult:
             _save_as_pdf(rgb, pdf_path, tmpl.dpi)
             generated += 1
         except Exception as e:
-            logger.error("Order %s: failed to generate %r — %s",
-                         order.order_id, item.title, e)
+            msg = f"Failed '{item.title}' (name: {item.name}): {type(e).__name__}: {e}"
+            logger.error("Order %s: %s", order.order_id, msg)
+            errors.append(msg)
             failed += 1
 
     # Zip the order folder
@@ -65,6 +68,7 @@ def generate_order(order: Order, template_manager, config) -> GenerationResult:
         files_skipped=skipped,
         files_failed=failed,
         zip_path=str(zip_path),
+        errors=errors,
     )
 
 def _flatten_to_rgb(img: Image.Image) -> Image.Image:

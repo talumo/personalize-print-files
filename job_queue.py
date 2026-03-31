@@ -46,6 +46,7 @@ def _process_job(job_id: str):
 
     total_gen = total_skip = total_fail = 0
     zip_paths = []
+    all_errors = []
 
     for order_id in order_ids:
         try:
@@ -55,6 +56,7 @@ def _process_job(job_id: str):
                 total_gen += result.files_generated
                 total_skip += result.files_skipped
                 total_fail += result.files_failed
+                all_errors.extend(result.errors)
                 db.mark_processed(order_id, job_id)
                 if result.zip_path:
                     zip_paths.append(result.zip_path)
@@ -67,7 +69,9 @@ def _process_job(job_id: str):
             db.update_job_status(job_id, 'failed', error='Shopify authentication failed. Check API credentials in Settings.')
             return  # Stop the whole job on auth failure
         except Exception as e:
-            logger.error("Error processing order %s: %s", order_id, e)
+            msg = f"Order {order_id}: {type(e).__name__}: {e}"
+            logger.error(msg)
+            all_errors.append(msg)
             total_fail += 1
 
     result_json = json.dumps({
@@ -76,6 +80,7 @@ def _process_job(job_id: str):
         'failed': total_fail,
         'zip_paths': zip_paths,
         'order_count': len(order_ids),
+        'errors': all_errors,
     })
     db.update_job_status(job_id, 'complete', result_json=result_json)
     logger.info("Job %s complete: %s", job_id, result_json)

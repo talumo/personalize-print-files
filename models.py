@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 @dataclass
 class LineItem:
@@ -30,4 +30,5 @@ class GenerationResult:
     files_skipped: int
     files_failed: int
     zip_path: str = ""   # absolute path to the zip file written by file_generator
+    errors: list = field(default_factory=list)  # per-file error messages for diagnostics
     # orders_processed is NOT here — aggregated by run_batch.py across all results
